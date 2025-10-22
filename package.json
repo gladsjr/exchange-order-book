@@ -1,0 +1,31 @@
+{
+    "name": "exchange-order-book",
+    "version": "1.0.0",
+    "description": "Exchange Descentralizada Didática com Order Book",
+    "main": "index.js",
+    "scripts": {
+        "compile": "npx hardhat compile",
+        "node": "npx hardhat node",
+        "serve": "node scripts/serve.js",
+        "deploy": "npx hardhat run scripts/deploy.js --network sepolia",
+        "deploy:local": "npx hardhat run scripts/deploy.js --network localhost",
+        "test:local": "npx hardhat run scripts/test-local.js --network localhost",
+        "test": "npx hardhat test"
+    },
+    "keywords": [
+        "ethereum",
+        "defi",
+        "exchange",
+        "orderbook"
+    ],
+    "author": "MPE",
+    "license": "MIT",
+    "devDependencies": {
+        "@nomicfoundation/hardhat-toolbox": "^3.0.0",
+        "hardhat": "^2.17.0"
+    },
+    "dependencies": {
+        "@openzeppelin/contracts": "^4.9.0",
+        "dotenv": "^16.3.0"
+    }
+}

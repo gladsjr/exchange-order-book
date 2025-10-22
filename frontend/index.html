@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MPE Exchange - Order Book</title>
+    <link rel="stylesheet" href="styles.css">
+    <!-- Ethers.js (v5) via jsDelivr; mais estável que cdn.ethers.io -->
+    <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>🏪 MPE Exchange</h1>
+            <p>Exchange Descentralizada Didática com Order Book</p>
+            <div id="connection-status" class="connection-status">
+                <button id="connect-wallet" class="btn btn-primary">Conectar MetaMask</button>
+                <div id="wallet-info" class="wallet-info" style="display: none;">
+                    <span id="wallet-address"></span>
+                    <button id="disconnect-wallet" class="btn btn-secondary">Desconectar</button>
+                </div>
+            </div>
+        </header>
+
+        <main>
+            <!-- Seção de Balances -->
+            <section class="balances-section">
+                <h2>💰 Seus Saldos</h2>
+                <div class="balances">
+                    <div class="balance-item">
+                        <span class="token-name">MPE1:</span>
+                        <span id="mpe1-balance" class="balance-amount">0</span>
+                    </div>
+                    <div class="balance-item">
+                        <span class="token-name">MPE2:</span>
+                        <span id="mpe2-balance" class="balance-amount">0</span>
+                    </div>
+                </div>
+                <button id="refresh-balances" class="btn btn-secondary">🔄 Atualizar Saldos</button>
+            </section>
+
+            <!-- Seção de Trading -->
+            <section class="trading-section">
+                <h2>📈 Criar Ordem</h2>
+                <div class="trading-form">
+                    <div class="form-group">
+                        <label>Tipo de Ordem:</label>
+                        <div class="radio-group">
+                            <label>
+                                <input type="radio" name="orderType" value="buy" checked>
+                                <span class="buy-label">Comprar MPE1 com MPE2</span>
+                            </label>
+                            <label>
+                                <input type="radio" name="orderType" value="sell">
+                                <span class="sell-label">Vender MPE1 por MPE2</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="amount-mpe1">Quantidade MPE1:</label>
+                        <input type="number" id="amount-mpe1" min="1" step="1" placeholder="Ex: 100">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="amount-mpe2">Quantidade MPE2:</label>
+                        <input type="number" id="amount-mpe2" min="1" step="1" placeholder="Ex: 200">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Preço (MPE2 por MPE1): <span id="calculated-price">-</span></label>
+                    </div>
+
+                    <button id="create-order" class="btn btn-primary">Criar Ordem</button>
+                </div>
+            </section>
+
+            <!-- Seção do Order Book -->
+            <section class="orderbook-section">
+                <h2>📊 Order Book</h2>
+                <div class="orderbook">
+                    <div class="orders-column">
+                        <h3 class="buy-orders-title">Ordens de Compra</h3>
+                        <div class="orders-header">
+                            <span>MPE1</span>
+                            <span>MPE2</span>
+                            <span>Preço</span>
+                            <span>Ação</span>
+                        </div>
+                        <div id="buy-orders" class="orders-list">
+                            <div class="no-orders">Nenhuma ordem de compra</div>
+                        </div>
+                    </div>
+
+                    <div class="orders-column">
+                        <h3 class="sell-orders-title">Ordens de Venda</h3>
+                        <div class="orders-header">
+                            <span>MPE1</span>
+                            <span>MPE2</span>
+                            <span>Preço</span>
+                            <span>Ação</span>
+                        </div>
+                        <div id="sell-orders" class="orders-list">
+                            <div class="no-orders">Nenhuma ordem de venda</div>
+                        </div>
+                    </div>
+                </div>
+                <button id="refresh-orderbook" class="btn btn-secondary">🔄 Atualizar Order Book</button>
+            </section>
+
+            <!-- Seção de Logs -->
+            <section class="logs-section">
+                <h2>📝 Logs de Transações</h2>
+                <div id="transaction-logs" class="logs-container">
+                    <div class="log-item">Conecte sua carteira para começar a negociar</div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="loading-overlay" style="display: none;">
+        <div class="loading-content">
+            <div class="spinner"></div>
+            <p>Processando transação...</p>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+
+</html>
