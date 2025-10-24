@@ -1,0 +1,70 @@
+{
+  "network": "sepolia",
+  "chainId": 11155111,
+  "deployedAt": "2025-10-24T15:17:27.850Z",
+  "deployer": "0x9CdaE55751F0b4dbe9a09ecE1E4bDb2E64E957De",
+  "contracts": {
+    "mpe1Token": {
+      "address": "0x0f13072e3AF610F35120316C49D0dd486fd9D32B",
+      "name": "MPE Token 1",
+      "symbol": "MPE1",
+      "decimals": 0,
+      "initialSupply": 1000000
+    },
+    "mpe2Token": {
+      "address": "0xBe3E8B1f67F31eF3aF0f1CfC100C5B1F66AE69Ce",
+      "name": "MPE Token 2",
+      "symbol": "MPE2",
+      "decimals": 0,
+      "initialSupply": 1000000
+    },
+    "exchange": {
+      "address": "0x9e356EB5e7b0b45f48E5eFbE7374d5010DE8Fa2a",
+      "tokenA": "0x0f13072e3AF610F35120316C49D0dd486fd9D32B",
+      "tokenB": "0xBe3E8B1f67F31eF3aF0f1CfC100C5B1F66AE69Ce"
+    }
+  },
+  "abis": {
+    "SimpleToken": [
+      "constructor(string,string,uint256)",
+      "event Approval(address indexed,address indexed,uint256)",
+      "event OwnershipTransferred(address indexed,address indexed)",
+      "event Transfer(address indexed,address indexed,uint256)",
+      "function allowance(address,address) view returns (uint256)",
+      "function approve(address,uint256) returns (bool)",
+      "function balanceOf(address) view returns (uint256)",
+      "function burn(address,uint256)",
+      "function decimals() pure returns (uint8)",
+      "function decreaseAllowance(address,uint256) returns (bool)",
+      "function increaseAllowance(address,uint256) returns (bool)",
+      "function mint(address,uint256)",
+      "function name() view returns (string)",
+      "function owner() view returns (address)",
+      "function renounceOwnership()",
+      "function symbol() view returns (string)",
+      "function totalSupply() view returns (uint256)",
+      "function transfer(address,uint256) returns (bool)",
+      "function transferFrom(address,address,uint256) returns (bool)",
+      "function transferOwnership(address)"
+    ],
+    "OrderBookExchange": [
+      "constructor(address,address)",
+      "event OfferAccepted(uint256 indexed,address indexed,address indexed,uint256,uint256)",
+      "event OfferCanceled(uint256 indexed)",
+      "event OfferCreated(uint256 indexed,address indexed,bool,uint256,uint256)",
+      "function acceptOffer(uint256)",
+      "function cancelOffer(uint256)",
+      "function createOfferA(uint256,uint256)",
+      "function createOfferB(uint256,uint256)",
+      "function getActiveOffersA() view returns (uint256[])",
+      "function getActiveOffersB() view returns (uint256[])",
+      "function getOffer(uint256) view returns ((uint256,address,bool,uint256,uint256,bool))",
+      "function nextOfferId() view returns (uint256)",
+      "function offers(uint256) view returns (uint256,address,bool,uint256,uint256,bool)",
+      "function offersA(uint256) view returns (uint256)",
+      "function offersB(uint256) view returns (uint256)",
+      "function tokenA() view returns (address)",
+      "function tokenB() view returns (address)"
+    ]
+  }
+}
