@@ -41,7 +41,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 // Carregar informações de deployment
 async function loadDeploymentInfo() {
     try {
-        const response = await fetch('./deployment.json');
+        // Tenta carregar do frontend/ primeiro (quando acessado via raiz), senão tenta local
+        let response;
+        try {
+            response = await fetch('./frontend/deployment.json');
+        } catch {
+            response = await fetch('./deployment.json');
+        }
         deploymentInfo = await response.json();
 
         if (!deploymentInfo.contracts) {
