@@ -5,6 +5,12 @@ let contracts = {};
 let deploymentInfo = {};
 let userAddress = null;
 
+// Função helper para formatar números com vírgula como separador decimal
+function formatNumber(value, decimals = 4) {
+    const num = typeof value === 'number' ? value : Number(value);
+    return num.toFixed(decimals).replace('.', ',');
+}
+
 // Elementos DOM
 const connectWalletBtn = document.getElementById('connect-wallet');
 const disconnectWalletBtn = document.getElementById('disconnect-wallet');
@@ -254,14 +260,14 @@ function calculatePrice() {
     const priceElement = document.getElementById('calculated-price');
 
     if (amountMpe1 > 0 && amountMpe2 > 0) {
-        const price = (amountMpe2 / amountMpe1).toFixed(4);
-        priceElement.textContent = price;
+        const price = amountMpe2 / amountMpe1;
+        priceElement.textContent = formatNumber(price, 4);
     } else {
         priceElement.textContent = '-';
     }
 }
 
-// Criar ordem
+// Criar oferta
 async function createOrder() {
     if (!signer || !contracts.exchange) {
         addLog('❌ Conecte sua carteira primeiro', 'log-error');
@@ -282,6 +288,7 @@ async function createOrder() {
         let tx;
 
         if (orderType === 'buy') {
+            // Oferta de COMPRA = oferece MPE2 por MPE1 (createOfferB)
             // Verificar allowance para MPE2
             const allowance = await contracts.mpe2Token.allowance(userAddress, contracts.exchange.address);
             if (allowance.lt(amountMpe2)) {
@@ -291,10 +298,11 @@ async function createOrder() {
                 addLog('✅ MPE2 aprovado', 'log-success');
             }
 
-            addLog('🔄 Criando ordem de compra...', 'log-info');
-            tx = await contracts.exchange.createBuyOrder(amountMpe1, amountMpe2);
+            addLog('🔄 Criando oferta de compra (oferece MPE2 por MPE1)...', 'log-info');
+            tx = await contracts.exchange.createOfferB(amountMpe2, amountMpe1);
 
         } else {
+            // Oferta de VENDA = oferece MPE1 por MPE2 (createOfferA)
             // Verificar allowance para MPE1
             const allowance = await contracts.mpe1Token.allowance(userAddress, contracts.exchange.address);
             if (allowance.lt(amountMpe1)) {
@@ -304,12 +312,12 @@ async function createOrder() {
                 addLog('✅ MPE1 aprovado', 'log-success');
             }
 
-            addLog('🔄 Criando ordem de venda...', 'log-info');
-            tx = await contracts.exchange.createSellOrder(amountMpe1, amountMpe2);
+            addLog('🔄 Criando oferta de venda (oferece MPE1 por MPE2)...', 'log-info');
+            tx = await contracts.exchange.createOfferA(amountMpe1, amountMpe2);
         }
 
         const receipt = await tx.wait();
-        addLog(`✅ Ordem criada! Hash: ${receipt.transactionHash}`, 'log-success');
+        addLog(`✅ Oferta criada! Hash: ${receipt.transactionHash}`, 'log-success');
 
         // Limpar formulário
         document.getElementById('amount-mpe1').value = '';
@@ -321,87 +329,178 @@ async function createOrder() {
         await refreshOrderbook();
 
     } catch (error) {
-        addLog('❌ Erro ao criar ordem: ' + error.message, 'log-error');
+        addLog('❌ Erro ao criar oferta: ' + error.message, 'log-error');
         console.error('Erro:', error);
     } finally {
         showLoading(false);
     }
 }
 
-// Cancelar ordem
-async function cancelOrder(orderId) {
+// Cancelar oferta
+async function cancelOffer(offerId) {
     if (!signer || !contracts.exchange) return;
 
     try {
         showLoading(true);
-        addLog(`🔄 Cancelando ordem ${orderId}...`, 'log-info');
+        addLog(`🔄 Cancelando oferta ${offerId}...`, 'log-info');
 
-        const tx = await contracts.exchange.cancelOrder(orderId);
+        const tx = await contracts.exchange.cancelOffer(offerId);
         const receipt = await tx.wait();
 
-        addLog(`✅ Ordem ${orderId} cancelada! Hash: ${receipt.transactionHash}`, 'log-success');
+        addLog(`✅ Oferta ${offerId} cancelada! Hash: ${receipt.transactionHash}`, 'log-success');
 
         await refreshBalances();
         await refreshOrderbook();
 
     } catch (error) {
-        addLog('❌ Erro ao cancelar ordem: ' + error.message, 'log-error');
+        addLog('❌ Erro ao cancelar oferta: ' + error.message, 'log-error');
         console.error('Erro:', error);
     } finally {
         showLoading(false);
     }
 }
 
-// Atualizar order book
+// Aceitar oferta
+async function acceptOffer(offerId, isOfferA) {
+    if (!signer || !contracts.exchange) return;
+
+    try {
+        showLoading(true);
+        addLog(`🔄 Aceitando oferta ${offerId}...`, 'log-info');
+
+        // Obter informações da oferta
+        const offerData = await contracts.exchange.getOffer(offerId);
+
+        // Converter array para objeto
+        const offer = {
+            id: offerData[0],
+            creator: offerData[1],
+            isOfferA: offerData[2],
+            amountOffered: offerData[3],
+            amountWanted: offerData[4],
+            isActive: offerData[5]
+        };
+
+        // Aprovar o token necessário
+        if (isOfferA) {
+            // Oferta A: criador oferece MPE1, aceitador precisa ter MPE2
+            const allowance = await contracts.mpe2Token.allowance(userAddress, contracts.exchange.address);
+            if (allowance.lt(offer.amountWanted)) {
+                addLog('🔄 Aprovando MPE2 para a exchange...', 'log-info');
+                const approveTx = await contracts.mpe2Token.approve(contracts.exchange.address, offer.amountWanted);
+                await approveTx.wait();
+                addLog('✅ MPE2 aprovado', 'log-success');
+            }
+        } else {
+            // Oferta B: criador oferece MPE2, aceitador precisa ter MPE1
+            const allowance = await contracts.mpe1Token.allowance(userAddress, contracts.exchange.address);
+            if (allowance.lt(offer.amountWanted)) {
+                addLog('🔄 Aprovando MPE1 para a exchange...', 'log-info');
+                const approveTx = await contracts.mpe1Token.approve(contracts.exchange.address, offer.amountWanted);
+                await approveTx.wait();
+                addLog('✅ MPE1 aprovado', 'log-success');
+            }
+        }
+
+        const tx = await contracts.exchange.acceptOffer(offerId);
+        const receipt = await tx.wait();
+
+        addLog(`✅ Oferta ${offerId} aceita! Hash: ${receipt.transactionHash}`, 'log-success');
+
+        await refreshBalances();
+        await refreshOrderbook();
+
+    } catch (error) {
+        addLog('❌ Erro ao aceitar oferta: ' + error.message, 'log-error');
+        console.error('Erro:', error);
+    } finally {
+        showLoading(false);
+    }
+}
+
+// Atualizar order book (agora ofertas)
 async function refreshOrderbook() {
     if (!signer || !contracts.exchange) return;
 
     try {
-        const [buyOrderIds, sellOrderIds] = await Promise.all([
-            contracts.exchange.getActiveBuyOrders(),
-            contracts.exchange.getActiveSellOrders()
+        const [offersAIds, offersBIds] = await Promise.all([
+            contracts.exchange.getActiveOffersA(),
+            contracts.exchange.getActiveOffersB()
         ]);
 
-        await displayOrders('buy-orders', buyOrderIds, true);
-        await displayOrders('sell-orders', sellOrderIds, false);
+        await displayOffers('buy-orders', offersBIds, false); // Ofertas B = MPE2→MPE1 (compra de MPE1)
+        await displayOffers('sell-orders', offersAIds, true); // Ofertas A = MPE1→MPE2 (venda de MPE1)
 
     } catch (error) {
-        addLog('❌ Erro ao atualizar order book: ' + error.message, 'log-error');
+        addLog('❌ Erro ao atualizar ofertas: ' + error.message, 'log-error');
     }
 }
 
-// Exibir ordens
-async function displayOrders(containerId, orderIds, isBuy) {
+// Exibir ofertas
+async function displayOffers(containerId, offerIds, isOfferA) {
     const container = document.getElementById(containerId);
 
-    if (orderIds.length === 0) {
-        container.innerHTML = `<div class="no-orders">Nenhuma ordem de ${isBuy ? 'compra' : 'venda'}</div>`;
+    if (offerIds.length === 0) {
+        container.innerHTML = `<div class="no-orders">Nenhuma oferta disponível</div>`;
         return;
     }
 
     let html = '';
 
-    for (const orderId of orderIds) {
+    for (const offerId of offerIds) {
         try {
-            const order = await contracts.exchange.getOrder(orderId);
-            const price = (order.amountB.toNumber() / order.amountA.toNumber()).toFixed(4);
-            const isOwner = order.trader.toLowerCase() === userAddress.toLowerCase();
+            const offerData = await contracts.exchange.getOffer(offerId);
+
+            // O contrato retorna struct como array:
+            // [0]: id, [1]: creator, [2]: isOfferA, [3]: amountOffered, [4]: amountWanted, [5]: isActive
+            const offer = {
+                id: offerData[0],
+                creator: offerData[1],
+                isOfferA: offerData[2],
+                amountOffered: offerData[3],
+                amountWanted: offerData[4],
+                isActive: offerData[5]
+            };
+
+            // Verificar se a oferta está ativa
+            if (!offer.isActive) {
+                console.log('Oferta inativa:', offerId.toString());
+                continue;
+            }
+
+            // Para ofertas A (MPE1→MPE2): preço = amountWanted(MPE2) / amountOffered(MPE1)
+            // Para ofertas B (MPE2→MPE1): preço = amountOffered(MPE2) / amountWanted(MPE1)
+            let mpe1Amount, mpe2Amount, price;
+
+            if (isOfferA) {
+                // Oferta A: vende MPE1 por MPE2
+                mpe1Amount = offer.amountOffered;
+                mpe2Amount = offer.amountWanted;
+                price = formatNumber(Number(mpe2Amount) / Number(mpe1Amount), 4);
+            } else {
+                // Oferta B: vende MPE2 por MPE1 (compra MPE1)
+                mpe1Amount = offer.amountWanted;
+                mpe2Amount = offer.amountOffered;
+                price = formatNumber(Number(mpe2Amount) / Number(mpe1Amount), 4);
+            }
+
+            const isOwner = offer.creator.toLowerCase() === userAddress.toLowerCase();
 
             html += `
                 <div class="order-item">
-                    <span>${order.amountA.toString()}</span>
-                    <span>${order.amountB.toString()}</span>
+                    <span>${mpe1Amount.toString()}</span>
+                    <span>${mpe2Amount.toString()}</span>
                     <span>${price}</span>
                     <span>
                         ${isOwner ?
-                    `<button class="cancel-btn" onclick="cancelOrder(${orderId})">Cancelar</button>` :
-                    '-'
+                    `<button class="cancel-btn" onclick="cancelOffer(${offerId})">Cancelar</button>` :
+                    `<button class="accept-btn" onclick="acceptOffer(${offerId}, ${isOfferA})">Aceitar</button>`
                 }
                     </span>
                 </div>
             `;
         } catch (error) {
-            console.error(`Erro ao carregar ordem ${orderId}:`, error);
+            console.error(`Erro ao carregar oferta ${offerId}:`, error);
         }
     }
 
@@ -410,8 +509,8 @@ async function displayOrders(containerId, orderIds, isBuy) {
 
 // Limpar order book
 function clearOrderbook() {
-    document.getElementById('buy-orders').innerHTML = '<div class="no-orders">Nenhuma ordem de compra</div>';
-    document.getElementById('sell-orders').innerHTML = '<div class="no-orders">Nenhuma ordem de venda</div>';
+    document.getElementById('buy-orders').innerHTML = '<div class="no-orders">Nenhuma oferta disponível</div>';
+    document.getElementById('sell-orders').innerHTML = '<div class="no-orders">Nenhuma oferta disponível</div>';
 }
 
 // Mostrar/ocultar loading

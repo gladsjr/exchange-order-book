@@ -6,50 +6,50 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
 /**
  * @title OrderBookExchange
- * @dev Exchange descentralizada simples com order book para fins didáticos
+ * @dev Exchange descentralizada simples com modelo de ofertas diretas para fins didáticos
  * Opera com dois tokens ERC-20 específicos definidos no construtor
+ * Modelo simplificado: usuário cria oferta e outro usuário aceita diretamente
  */
 contract OrderBookExchange is ReentrancyGuard {
     // Tokens que serão negociados
-    IERC20 public immutable tokenA;
-    IERC20 public immutable tokenB;
+    IERC20 public immutable tokenA; // MPE1
+    IERC20 public immutable tokenB; // MPE2
 
-    // Estrutura de uma ordem
-    struct Order {
+    // Estrutura de uma oferta
+    struct Offer {
         uint256 id;
-        address trader;
-        bool isBuy; // true = compra tokenA com tokenB, false = vende tokenA por tokenB
-        uint256 amountA; // quantidade de tokenA
-        uint256 amountB; // quantidade de tokenB
-        uint256 filledA; // quantidade de tokenA já executada
-        uint256 filledB; // quantidade de tokenB já executada
+        address creator;
+        bool isOfferA; // true = oferece tokenA por tokenB, false = oferece tokenB por tokenA
+        uint256 amountOffered; // quantidade oferecida
+        uint256 amountWanted; // quantidade desejada em troca
         bool isActive;
     }
 
-    // Armazenamento das ordens
-    mapping(uint256 => Order) public orders;
-    uint256[] public buyOrders; // IDs das ordens de compra ativas
-    uint256[] public sellOrders; // IDs das ordens de venda ativas
+    // Armazenamento das ofertas
+    mapping(uint256 => Offer) public offers;
+    uint256[] public offersA; // IDs das ofertas de tokenA por tokenB
+    uint256[] public offersB; // IDs das ofertas de tokenB por tokenA
 
-    uint256 public nextOrderId = 1;
+    uint256 public nextOfferId = 1;
 
     // Eventos
-    event OrderCreated(
-        uint256 indexed orderId,
-        address indexed trader,
-        bool isBuy,
-        uint256 amountA,
-        uint256 amountB
+    event OfferCreated(
+        uint256 indexed offerId,
+        address indexed creator,
+        bool isOfferA,
+        uint256 amountOffered,
+        uint256 amountWanted
     );
 
-    event OrderMatched(
-        uint256 indexed buyOrderId,
-        uint256 indexed sellOrderId,
-        uint256 amountA,
-        uint256 amountB
+    event OfferAccepted(
+        uint256 indexed offerId,
+        address indexed creator,
+        address indexed acceptor,
+        uint256 amountOffered,
+        uint256 amountWanted
     );
 
-    event OrderCanceled(uint256 indexed orderId);
+    event OfferCanceled(uint256 indexed offerId);
 
     /**
      * @dev Construtor que define os dois tokens que serão negociados
@@ -66,306 +66,256 @@ contract OrderBookExchange is ReentrancyGuard {
     }
 
     /**
-     * @dev Cria uma ordem de compra (comprar tokenA com tokenB)
+     * @dev Cria uma oferta de tokenA por tokenB
      */
-    function createBuyOrder(
-        uint256 amountA,
-        uint256 amountB
+    function createOfferA(
+        uint256 amountOffered,
+        uint256 amountWanted
     ) external nonReentrant {
-        require(amountA > 0 && amountB > 0, "Amounts must be greater than 0");
         require(
-            tokenB.balanceOf(msg.sender) >= amountB,
-            "Insufficient tokenB balance"
+            amountOffered > 0 && amountWanted > 0,
+            "Amounts must be greater than 0"
         );
         require(
-            tokenB.allowance(msg.sender, address(this)) >= amountB,
-            "Insufficient tokenB allowance"
-        );
-
-        // Transfere tokenB para o contrato
-        tokenB.transferFrom(msg.sender, address(this), amountB);
-
-        // Cria a ordem
-        orders[nextOrderId] = Order({
-            id: nextOrderId,
-            trader: msg.sender,
-            isBuy: true,
-            amountA: amountA,
-            amountB: amountB,
-            filledA: 0,
-            filledB: 0,
-            isActive: true
-        });
-
-        buyOrders.push(nextOrderId);
-
-        emit OrderCreated(nextOrderId, msg.sender, true, amountA, amountB);
-
-        // Tenta fazer match imediatamente
-        _tryMatchOrder(nextOrderId);
-
-        nextOrderId++;
-    }
-
-    /**
-     * @dev Cria uma ordem de venda (vender tokenA por tokenB)
-     */
-    function createSellOrder(
-        uint256 amountA,
-        uint256 amountB
-    ) external nonReentrant {
-        require(amountA > 0 && amountB > 0, "Amounts must be greater than 0");
-        require(
-            tokenA.balanceOf(msg.sender) >= amountA,
+            tokenA.balanceOf(msg.sender) >= amountOffered,
             "Insufficient tokenA balance"
         );
         require(
-            tokenA.allowance(msg.sender, address(this)) >= amountA,
+            tokenA.allowance(msg.sender, address(this)) >= amountOffered,
             "Insufficient tokenA allowance"
         );
 
         // Transfere tokenA para o contrato
-        tokenA.transferFrom(msg.sender, address(this), amountA);
+        tokenA.transferFrom(msg.sender, address(this), amountOffered);
 
-        // Cria a ordem
-        orders[nextOrderId] = Order({
-            id: nextOrderId,
-            trader: msg.sender,
-            isBuy: false,
-            amountA: amountA,
-            amountB: amountB,
-            filledA: 0,
-            filledB: 0,
+        // Cria a oferta
+        offers[nextOfferId] = Offer({
+            id: nextOfferId,
+            creator: msg.sender,
+            isOfferA: true,
+            amountOffered: amountOffered,
+            amountWanted: amountWanted,
             isActive: true
         });
 
-        sellOrders.push(nextOrderId);
+        offersA.push(nextOfferId);
 
-        emit OrderCreated(nextOrderId, msg.sender, false, amountA, amountB);
+        emit OfferCreated(
+            nextOfferId,
+            msg.sender,
+            true,
+            amountOffered,
+            amountWanted
+        );
 
-        // Tenta fazer match imediatamente
-        _tryMatchOrder(nextOrderId);
-
-        nextOrderId++;
+        nextOfferId++;
     }
 
     /**
-     * @dev Cancela uma ordem ativa
+     * @dev Cria uma oferta de tokenB por tokenA
      */
-    function cancelOrder(uint256 orderId) external nonReentrant {
-        Order storage order = orders[orderId];
-        require(order.isActive, "Order not active");
-        require(order.trader == msg.sender, "Not order owner");
+    function createOfferB(
+        uint256 amountOffered,
+        uint256 amountWanted
+    ) external nonReentrant {
+        require(
+            amountOffered > 0 && amountWanted > 0,
+            "Amounts must be greater than 0"
+        );
+        require(
+            tokenB.balanceOf(msg.sender) >= amountOffered,
+            "Insufficient tokenB balance"
+        );
+        require(
+            tokenB.allowance(msg.sender, address(this)) >= amountOffered,
+            "Insufficient tokenB allowance"
+        );
 
-        order.isActive = false;
+        // Transfere tokenB para o contrato
+        tokenB.transferFrom(msg.sender, address(this), amountOffered);
 
-        // Devolve os tokens não executados
-        if (order.isBuy) {
-            uint256 refundB = order.amountB - order.filledB;
-            if (refundB > 0) {
-                tokenB.transfer(order.trader, refundB);
-            }
-            _removeFromBuyOrders(orderId);
+        // Cria a oferta
+        offers[nextOfferId] = Offer({
+            id: nextOfferId,
+            creator: msg.sender,
+            isOfferA: false,
+            amountOffered: amountOffered,
+            amountWanted: amountWanted,
+            isActive: true
+        });
+
+        offersB.push(nextOfferId);
+
+        emit OfferCreated(
+            nextOfferId,
+            msg.sender,
+            false,
+            amountOffered,
+            amountWanted
+        );
+
+        nextOfferId++;
+    }
+
+    /**
+     * @dev Aceita uma oferta existente
+     */
+    function acceptOffer(uint256 offerId) external nonReentrant {
+        Offer storage offer = offers[offerId];
+        require(offer.isActive, "Offer not active");
+        require(offer.creator != msg.sender, "Cannot accept own offer");
+
+        if (offer.isOfferA) {
+            // Oferta de tokenA por tokenB
+            // Acceptor precisa ter tokenB suficiente
+            require(
+                tokenB.balanceOf(msg.sender) >= offer.amountWanted,
+                "Insufficient tokenB balance"
+            );
+            require(
+                tokenB.allowance(msg.sender, address(this)) >=
+                    offer.amountWanted,
+                "Insufficient tokenB allowance"
+            );
+
+            // Transfere tokenB do acceptor para o creator
+            tokenB.transferFrom(msg.sender, offer.creator, offer.amountWanted);
+
+            // Transfere tokenA do contrato para o acceptor
+            tokenA.transfer(msg.sender, offer.amountOffered);
         } else {
-            uint256 refundA = order.amountA - order.filledA;
-            if (refundA > 0) {
-                tokenA.transfer(order.trader, refundA);
-            }
-            _removeFromSellOrders(orderId);
+            // Oferta de tokenB por tokenA
+            // Acceptor precisa ter tokenA suficiente
+            require(
+                tokenA.balanceOf(msg.sender) >= offer.amountWanted,
+                "Insufficient tokenA balance"
+            );
+            require(
+                tokenA.allowance(msg.sender, address(this)) >=
+                    offer.amountWanted,
+                "Insufficient tokenA allowance"
+            );
+
+            // Transfere tokenA do acceptor para o creator
+            tokenA.transferFrom(msg.sender, offer.creator, offer.amountWanted);
+
+            // Transfere tokenB do contrato para o acceptor
+            tokenB.transfer(msg.sender, offer.amountOffered);
         }
 
-        emit OrderCanceled(orderId);
-    }
+        offer.isActive = false;
 
-    /**
-     * @dev Tenta fazer match de uma ordem com ordens existentes
-     */
-    function _tryMatchOrder(uint256 newOrderId) internal {
-        Order storage newOrder = orders[newOrderId];
-
-        if (newOrder.isBuy) {
-            // Ordem de compra: procura ordens de venda compatíveis
-            _matchBuyOrder(newOrderId);
+        if (offer.isOfferA) {
+            _removeFromOffersA(offerId);
         } else {
-            // Ordem de venda: procura ordens de compra compatíveis
-            _matchSellOrder(newOrderId);
+            _removeFromOffersB(offerId);
         }
+
+        emit OfferAccepted(
+            offerId,
+            offer.creator,
+            msg.sender,
+            offer.amountOffered,
+            offer.amountWanted
+        );
     }
 
     /**
-     * @dev Faz match de uma ordem de compra com ordens de venda
+     * @dev Cancela uma oferta ativa
      */
-    function _matchBuyOrder(uint256 buyOrderId) internal {
-        Order storage buyOrder = orders[buyOrderId];
+    function cancelOffer(uint256 offerId) external nonReentrant {
+        Offer storage offer = offers[offerId];
+        require(offer.isActive, "Offer not active");
+        require(offer.creator == msg.sender, "Not offer creator");
 
-        for (uint256 i = 0; i < sellOrders.length; i++) {
-            uint256 sellOrderId = sellOrders[i];
-            Order storage sellOrder = orders[sellOrderId];
+        offer.isActive = false;
 
-            if (!sellOrder.isActive) continue;
-
-            // Verifica se as ordens são compatíveis (preços cruzados)
-            // buyOrder quer: amountA tokenA por amountB tokenB
-            // sellOrder oferece: amountA tokenA por amountB tokenB
-            // Compatível se: buyOrder.amountB/buyOrder.amountA >= sellOrder.amountB/sellOrder.amountA
-            if (
-                buyOrder.amountB * sellOrder.amountA >=
-                sellOrder.amountB * buyOrder.amountA
-            ) {
-                _executeMatch(buyOrderId, sellOrderId);
-
-                if (!buyOrder.isActive) break; // Ordem de compra completamente executada
-            }
+        // Devolve os tokens ao criador
+        if (offer.isOfferA) {
+            tokenA.transfer(offer.creator, offer.amountOffered);
+            _removeFromOffersA(offerId);
+        } else {
+            tokenB.transfer(offer.creator, offer.amountOffered);
+            _removeFromOffersB(offerId);
         }
+
+        emit OfferCanceled(offerId);
     }
 
     /**
-     * @dev Faz match de uma ordem de venda com ordens de compra
+     * @dev Remove oferta da lista de ofertas A
      */
-    function _matchSellOrder(uint256 sellOrderId) internal {
-        Order storage sellOrder = orders[sellOrderId];
-
-        for (uint256 i = 0; i < buyOrders.length; i++) {
-            uint256 buyOrderId = buyOrders[i];
-            Order storage buyOrder = orders[buyOrderId];
-
-            if (!buyOrder.isActive) continue;
-
-            // Verifica se as ordens são compatíveis
-            if (
-                buyOrder.amountB * sellOrder.amountA >=
-                sellOrder.amountB * buyOrder.amountA
-            ) {
-                _executeMatch(buyOrderId, sellOrderId);
-
-                if (!sellOrder.isActive) break; // Ordem de venda completamente executada
-            }
-        }
-    }
-
-    /**
-     * @dev Executa o match entre duas ordens compatíveis
-     */
-    function _executeMatch(uint256 buyOrderId, uint256 sellOrderId) internal {
-        Order storage buyOrder = orders[buyOrderId];
-        Order storage sellOrder = orders[sellOrderId];
-
-        // Calcula quantidades a serem executadas (pega o menor entre as ordens)
-        uint256 remainingBuyA = buyOrder.amountA - buyOrder.filledA;
-        uint256 remainingSellA = sellOrder.amountA - sellOrder.filledA;
-        uint256 executeA = remainingBuyA < remainingSellA
-            ? remainingBuyA
-            : remainingSellA;
-
-        // Calcula executeB proporcionalmente baseado na ordem de venda
-        uint256 executeB = (executeA * sellOrder.amountB) / sellOrder.amountA;
-
-        // Atualiza as ordens
-        buyOrder.filledA += executeA;
-        buyOrder.filledB += executeB;
-        sellOrder.filledA += executeA;
-        sellOrder.filledB += executeB;
-
-        // Transfere tokens
-        tokenA.transfer(buyOrder.trader, executeA); // Comprador recebe tokenA
-        tokenB.transfer(sellOrder.trader, executeB); // Vendedor recebe tokenB
-
-        emit OrderMatched(buyOrderId, sellOrderId, executeA, executeB);
-
-        // Verifica se as ordens foram completamente executadas
-        if (buyOrder.filledA == buyOrder.amountA) {
-            buyOrder.isActive = false;
-            _removeFromBuyOrders(buyOrderId);
-
-            // Devolve tokenB não utilizado (se houver)
-            uint256 refundB = buyOrder.amountB - buyOrder.filledB;
-            if (refundB > 0) {
-                tokenB.transfer(buyOrder.trader, refundB);
-            }
-        }
-
-        if (sellOrder.filledA == sellOrder.amountA) {
-            sellOrder.isActive = false;
-            _removeFromSellOrders(sellOrderId);
-        }
-    }
-
-    /**
-     * @dev Remove ordem da lista de ordens de compra
-     */
-    function _removeFromBuyOrders(uint256 orderId) internal {
-        for (uint256 i = 0; i < buyOrders.length; i++) {
-            if (buyOrders[i] == orderId) {
-                buyOrders[i] = buyOrders[buyOrders.length - 1];
-                buyOrders.pop();
+    function _removeFromOffersA(uint256 offerId) internal {
+        for (uint256 i = 0; i < offersA.length; i++) {
+            if (offersA[i] == offerId) {
+                offersA[i] = offersA[offersA.length - 1];
+                offersA.pop();
                 break;
             }
         }
     }
 
     /**
-     * @dev Remove ordem da lista de ordens de venda
+     * @dev Remove oferta da lista de ofertas B
      */
-    function _removeFromSellOrders(uint256 orderId) internal {
-        for (uint256 i = 0; i < sellOrders.length; i++) {
-            if (sellOrders[i] == orderId) {
-                sellOrders[i] = sellOrders[sellOrders.length - 1];
-                sellOrders.pop();
+    function _removeFromOffersB(uint256 offerId) internal {
+        for (uint256 i = 0; i < offersB.length; i++) {
+            if (offersB[i] == offerId) {
+                offersB[i] = offersB[offersB.length - 1];
+                offersB.pop();
                 break;
             }
         }
     }
 
     /**
-     * @dev Retorna todas as ordens de compra ativas
+     * @dev Retorna todas as ofertas A ativas
      */
-    function getActiveBuyOrders() external view returns (uint256[] memory) {
-        uint256[] memory activeBuyOrders = new uint256[](buyOrders.length);
+    function getActiveOffersA() external view returns (uint256[] memory) {
+        uint256[] memory activeOffersA = new uint256[](offersA.length);
         uint256 count = 0;
 
-        for (uint256 i = 0; i < buyOrders.length; i++) {
-            if (orders[buyOrders[i]].isActive) {
-                activeBuyOrders[count] = buyOrders[i];
+        for (uint256 i = 0; i < offersA.length; i++) {
+            if (offers[offersA[i]].isActive) {
+                activeOffersA[count] = offersA[i];
                 count++;
             }
         }
 
-        // Redimensiona o array para remover elementos vazios
         uint256[] memory result = new uint256[](count);
         for (uint256 i = 0; i < count; i++) {
-            result[i] = activeBuyOrders[i];
+            result[i] = activeOffersA[i];
         }
 
         return result;
     }
 
     /**
-     * @dev Retorna todas as ordens de venda ativas
+     * @dev Retorna todas as ofertas B ativas
      */
-    function getActiveSellOrders() external view returns (uint256[] memory) {
-        uint256[] memory activeSellOrders = new uint256[](sellOrders.length);
+    function getActiveOffersB() external view returns (uint256[] memory) {
+        uint256[] memory activeOffersB = new uint256[](offersB.length);
         uint256 count = 0;
 
-        for (uint256 i = 0; i < sellOrders.length; i++) {
-            if (orders[sellOrders[i]].isActive) {
-                activeSellOrders[count] = sellOrders[i];
+        for (uint256 i = 0; i < offersB.length; i++) {
+            if (offers[offersB[i]].isActive) {
+                activeOffersB[count] = offersB[i];
                 count++;
             }
         }
 
-        // Redimensiona o array para remover elementos vazios
         uint256[] memory result = new uint256[](count);
         for (uint256 i = 0; i < count; i++) {
-            result[i] = activeSellOrders[i];
+            result[i] = activeOffersB[i];
         }
 
         return result;
     }
 
     /**
-     * @dev Retorna informações de uma ordem específica
+     * @dev Retorna informações de uma oferta específica
      */
-    function getOrder(uint256 orderId) external view returns (Order memory) {
-        return orders[orderId];
+    function getOffer(uint256 offerId) external view returns (Offer memory) {
+        return offers[offerId];
     }
 }

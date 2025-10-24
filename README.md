@@ -116,22 +116,5 @@ Este é um projeto **APENAS DIDÁTICO**. Não use em produção sem:
 - Implementação de funcionalidades avançadas
 - Otimizações de gas
 
-## 🎓 Para Estudantes
-
-### Exercícios Sugeridos:
-1. Modifique o contrato para adicionar taxas de transação
-2. Implemente ordens de mercado além das ordens limitadas
-3. Adicione histórico de transações na interface
-4. Crie um sistema de recompensas para market makers
-5. Implemente um token de governança para a exchange
-
-### Conceitos para Estudar:
-- Automated Market Makers (AMM)
-- Liquidity Pools
-- Yield Farming
-- Flash Loans
-- MEV (Maximal Extractable Value)
-
-## 📄 Licença
 
 MIT License - Use livremente para fins educacionais!
