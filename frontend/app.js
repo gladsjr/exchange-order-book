@@ -42,13 +42,21 @@ document.addEventListener('DOMContentLoaded', async () => {
 async function loadDeploymentInfo() {
     try {
         // Tenta carregar do frontend/ primeiro (quando acessado via raiz), senão tenta local
-        let response;
-        try {
-            response = await fetch('./frontend/deployment.json');
-        } catch {
+        console.log('🔍 Tentando carregar: ./frontend/deployment.json');
+        let response = await fetch('./frontend/deployment.json');
+
+        // Se der 404, tenta o caminho local
+        if (!response.ok) {
+            console.log('⚠️ Primeiro caminho falhou, tentando: ./deployment.json');
             response = await fetch('./deployment.json');
         }
+
+        if (!response.ok) {
+            throw new Error(`Arquivo deployment.json não encontrado (status: ${response.status})`);
+        }
+
         deploymentInfo = await response.json();
+        console.log('✅ deployment.json carregado:', deploymentInfo);
 
         if (!deploymentInfo.contracts) {
             throw new Error('Informações de deployment não encontradas');
@@ -56,6 +64,7 @@ async function loadDeploymentInfo() {
 
         addLog('✅ Configuração carregada com sucesso', 'log-success');
     } catch (error) {
+        console.error('❌ Erro detalhado:', error);
         addLog('❌ Erro ao carregar configuração: ' + error.message, 'log-error');
         addLog('📄 Execute o script de deploy primeiro: npm run deploy', 'log-info');
     }
