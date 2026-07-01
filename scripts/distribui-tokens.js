@@ -3,16 +3,51 @@ const fs = require("fs");
 const path = require("path");
 
 async function main() {
-    // Valores fixos para distribuição
-    const amountEther = "0.01";  // 0.01 ETH por endereço
-    const amountMPE1 = "5";      // 5 MPE1 por endereço
-    const amountMPE2 = "5";      // 5 MPE2 por endereço
+    // Carregar configuração de distribuição (quais tokens e quantidades).
+    // Cada token tem { enviar: bool, quantidade: string }. Só é distribuído
+    // quando enviar === true E quantidade > 0.
+    const configPath = path.join(__dirname, "..", "distribuicao-config.json");
+
+    if (!fs.existsSync(configPath)) {
+        console.error("❌ Arquivo distribuicao-config.json não encontrado!");
+        console.error("📝 Crie o arquivo na raiz do projeto. Exemplo:");
+        console.error('   {');
+        console.error('     "eth":  { "enviar": true,  "quantidade": "0.01" },');
+        console.error('     "mpe1": { "enviar": true,  "quantidade": "5" },');
+        console.error('     "mpe2": { "enviar": false, "quantidade": "0" }');
+        console.error('   }');
+        process.exit(1);
+    }
+
+    const config = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+
+    // Normaliza cada token: ativo só se "enviar" for true e a quantidade for > 0.
+    const cfg = (token, padrao = "0") => {
+        const c = config[token] || {};
+        const quantidade = (c.quantidade ?? padrao).toString();
+        const ativo = c.enviar === true && parseFloat(quantidade) > 0;
+        return { ativo, quantidade };
+    };
+
+    const eth = cfg("eth");
+    const mpe1 = cfg("mpe1");
+    const mpe2 = cfg("mpe2");
+
+    const amountEther = eth.quantidade;
+    const amountMPE1 = mpe1.quantidade;
+    const amountMPE2 = mpe2.quantidade;
+
+    if (!eth.ativo && !mpe1.ativo && !mpe2.ativo) {
+        console.error("❌ Nenhum token habilitado para envio no distribuicao-config.json!");
+        console.error('📝 Marque "enviar": true e uma "quantidade" maior que 0 para ao menos um token.');
+        process.exit(1);
+    }
 
     console.log("🚀 Iniciando distribuição de tokens...\n");
-    console.log("📦 Quantidades a distribuir por endereço:");
-    console.log(`   💎 ETH: ${amountEther}`);
-    console.log(`   🪙 MPE1: ${amountMPE1}`);
-    console.log(`   🪙 MPE2: ${amountMPE2}\n`);
+    console.log("📦 Tokens e quantidades a distribuir por endereço:");
+    console.log(`   💎 ETH:  ${eth.ativo  ? amountEther : "— (desativado)"}`);
+    console.log(`   🪙 MPE1: ${mpe1.ativo ? amountMPE1  : "— (desativado)"}`);
+    console.log(`   🪙 MPE2: ${mpe2.ativo ? amountMPE2  : "— (desativado)"}\n`);
 
     // Carregar endereços do arquivo
     const addressesFilePath = path.join(__dirname, "..", "recipient-addresses.txt");
@@ -73,22 +108,22 @@ async function main() {
     console.log(`   MPE1: ${mpe1Balance.toString()}`);
     console.log(`   MPE2: ${mpe2Balance.toString()}\n`);
 
-    // Verificar se há saldo suficiente
+    // Verificar se há saldo suficiente (apenas para os tokens habilitados)
     const totalMPE1Needed = BigInt(amountMPE1) * BigInt(addresses.length);
     const totalMPE2Needed = BigInt(amountMPE2) * BigInt(addresses.length);
     const totalEtherNeeded = ethers.parseEther(amountEther) * BigInt(addresses.length);
 
-    if (mpe1Balance < totalMPE1Needed) {
+    if (mpe1.ativo && mpe1Balance < totalMPE1Needed) {
         console.error(`❌ Saldo insuficiente de MPE1! Necessário: ${totalMPE1Needed}, Disponível: ${mpe1Balance}`);
         process.exit(1);
     }
 
-    if (mpe2Balance < totalMPE2Needed) {
+    if (mpe2.ativo && mpe2Balance < totalMPE2Needed) {
         console.error(`❌ Saldo insuficiente de MPE2! Necessário: ${totalMPE2Needed}, Disponível: ${mpe2Balance}`);
         process.exit(1);
     }
 
-    if (balance < totalEtherNeeded) {
+    if (eth.ativo && balance < totalEtherNeeded) {
         console.error(`❌ Saldo insuficiente de ETH! Necessário: ${ethers.formatEther(totalEtherNeeded)}, Disponível: ${ethers.formatEther(balance)}`);
         process.exit(1);
     }
@@ -101,10 +136,12 @@ async function main() {
     let successCount = 0;
     let errorCount = 0;
 
-    console.log("⚡ Modo OTIMIZADO: 3 transações em paralelo por endereço\n"); const allResults = [];
+    console.log("📤 Modo SEQUENCIAL: 1 transação por vez (compatível com conta delegada/EIP-7702)\n");
+    const allResults = [];
 
-    // Processar endereços sequencialmente (necessário por causa do nonce)
-    // Mas enviar as 3 transações de cada endereço em paralelo
+    // Processar endereços e transações de forma sequencial.
+    // Contas delegadas (EIP-7702) só aceitam 1 transação pendente por vez,
+    // então cada envio espera a confirmação antes do próximo.
     for (let i = 0; i < addresses.length; i++) {
         const recipient = addresses[i];
         const recipientNum = i + 1;
@@ -113,52 +150,31 @@ async function main() {
         try {
             console.log(`\n[${recipientNum}/${totalNum}] 📤 Enviando para: ${recipient}`);
 
-            // Pegar nonce base atual
-            let currentNonce = await deployer.getNonce();
-            const startNonce = currentNonce;
-
-            // Preparar as 3 transações com nonces sequenciais
-            const txPromises = [];
-
             // Enviar ETH
-            if (parseFloat(amountEther) > 0) {
-                const ethTxPromise = deployer.sendTransaction({
+            if (eth.ativo) {
+                const tx = await deployer.sendTransaction({
                     to: recipient,
-                    value: ethers.parseEther(amountEther),
-                    nonce: currentNonce++
-                }).then(tx => {
-                    console.log(`[${recipientNum}/${totalNum}] 💎 ETH enviado! Hash: ${tx.hash}`);
-                    return tx.wait();
+                    value: ethers.parseEther(amountEther)
                 });
-                txPromises.push(ethTxPromise);
+                console.log(`[${recipientNum}/${totalNum}] 💎 ETH enviado! Hash: ${tx.hash}`);
+                await tx.wait();
             }
 
             // Enviar MPE1
-            if (parseInt(amountMPE1) > 0) {
-                const mpe1TxPromise = mpe1Token.transfer(recipient, amountMPE1, {
-                    nonce: currentNonce++
-                }).then(tx => {
-                    console.log(`[${recipientNum}/${totalNum}] 🪙 MPE1 enviado! Hash: ${tx.hash}`);
-                    return tx.wait();
-                });
-                txPromises.push(mpe1TxPromise);
+            if (mpe1.ativo) {
+                const tx = await mpe1Token.transfer(recipient, amountMPE1);
+                console.log(`[${recipientNum}/${totalNum}] 🪙 MPE1 enviado! Hash: ${tx.hash}`);
+                await tx.wait();
             }
 
             // Enviar MPE2
-            if (parseInt(amountMPE2) > 0) {
-                const mpe2TxPromise = mpe2Token.transfer(recipient, amountMPE2, {
-                    nonce: currentNonce++
-                }).then(tx => {
-                    console.log(`[${recipientNum}/${totalNum}] 🪙 MPE2 enviado! Hash: ${tx.hash}`);
-                    return tx.wait();
-                });
-                txPromises.push(mpe2TxPromise);
+            if (mpe2.ativo) {
+                const tx = await mpe2Token.transfer(recipient, amountMPE2);
+                console.log(`[${recipientNum}/${totalNum}] 🪙 MPE2 enviado! Hash: ${tx.hash}`);
+                await tx.wait();
             }
 
-            // Aguardar confirmação das 3 transações em paralelo
-            await Promise.all(txPromises);
-
-            console.log(`[${recipientNum}/${totalNum}] ✅ Completo! (nonces ${startNonce}-${currentNonce - 1})`);
+            console.log(`[${recipientNum}/${totalNum}] ✅ Completo!`);
             allResults.push({ success: true, recipient });
 
         } catch (error) {
@@ -182,9 +198,9 @@ async function main() {
     console.log(`✅ Sucesso: ${successCount} endereços`);
     console.log(`❌ Falhas: ${errorCount} endereços`);
     console.log(`📦 Total distribuído:`);
-    console.log(`   💎 ETH: ${parseFloat(amountEther) * successCount}`);
-    console.log(`   🪙 MPE1: ${parseInt(amountMPE1) * successCount}`);
-    console.log(`   🪙 MPE2: ${parseInt(amountMPE2) * successCount}`);
+    console.log(`   💎 ETH: ${eth.ativo  ? parseFloat(amountEther) * successCount : "— (desativado)"}`);
+    console.log(`   🪙 MPE1: ${mpe1.ativo ? parseInt(amountMPE1) * successCount  : "— (desativado)"}`);
+    console.log(`   🪙 MPE2: ${mpe2.ativo ? parseInt(amountMPE2) * successCount  : "— (desativado)"}`);
     console.log("=".repeat(80));
 
     // Mostrar falhas, se houver

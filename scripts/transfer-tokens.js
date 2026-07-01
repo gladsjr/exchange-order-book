@@ -37,18 +37,12 @@ async function main() {
 
     // Destinatários MPE1
     const mpe1Recipients = [
-        '0x3B2d68c9f56Ecc7809c90530A42183052F48CEf2',
-        '0xe83E42c3D03D1936C2b8814809E4b837dc4990f0',
-        '0xE9D71C4660FB13ad625d8fCB65e00C659E11eeb0',
-        '0x00c332EF1033f20c32c5adDc74dDA2c133BaA10C'
+        '0x219211e83892d9adb086938109d82b2c4b76ecda'
     ];
 
     // Destinatários MPE2
     const mpe2Recipients = [
-        '0xc586cbdD2fa9fC7499A4B3872B0862FB45Db2422',
-        '0x96f9672599272C43865338214a276b0D5E217971',
-        '0x1D43Bdb2Ad5667DC9923E0845C4E7E1636F20Ea1',
-        '0x00660aC0820453f1dDafE25f26a25F1CD7718a02'
+        '0x66f1b143e15bf63dc6cd89c73bcbd2c3b99cadeb'
     ];
 
     const amountToTransfer = 100; // 100 tokens (sem decimais)

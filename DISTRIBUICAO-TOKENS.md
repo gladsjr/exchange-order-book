@@ -27,12 +27,39 @@ Edite o arquivo `recipient-addresses.txt` na raiz do projeto e adicione os ender
 - Linhas começando com `#` são comentários (ignoradas)
 - Endereços inválidos são automaticamente filtrados
 
-### 2. Executar o script
+### 2. Definir quais tokens enviar e em que quantidades
 
-O script distribui valores fixos para cada endereço:
-- **0.01 ETH**
-- **5 MPE1**
-- **5 MPE2**
+Quais dos três tokens (ETH, MPE1, MPE2) serão enviados — e em que quantidade — é
+controlado pelo arquivo `distribuicao-config.json` na raiz do projeto:
+
+```json
+{
+  "eth":  { "enviar": true,  "quantidade": "0.01" },
+  "mpe1": { "enviar": true,  "quantidade": "5" },
+  "mpe2": { "enviar": false, "quantidade": "0" }
+}
+```
+
+**Como funciona:**
+- Cada token tem dois campos: `enviar` (true/false) e `quantidade` (texto).
+- Um token só é distribuído quando `enviar` é `true` **e** `quantidade` é maior que 0.
+- Para enviar apenas alguns tokens, marque `enviar: false` (ou quantidade `"0"`) nos demais.
+- A verificação de saldo é feita só para os tokens habilitados.
+- Quantidades de ETH aceitam decimais (`"0.01"`); MPE1 e MPE2 são inteiros (decimais = 0).
+
+**Exemplo — enviar só 10 MPE1, sem ETH e sem MPE2:**
+
+```json
+{
+  "eth":  { "enviar": false, "quantidade": "0" },
+  "mpe1": { "enviar": true,  "quantidade": "10" },
+  "mpe2": { "enviar": false, "quantidade": "0" }
+}
+```
+
+### 3. Executar o script
+
+O comando é o mesmo de antes — o script lê o `distribuicao-config.json` automaticamente.
 
 #### Rede Local (Hardhat):
 
@@ -44,13 +71,6 @@ npx hardhat run scripts/distribui-tokens.js --network localhost
 
 ```bash
 npx hardhat run scripts/distribui-tokens.js --network sepolia
-```
-
-**Nota:** Se precisar alterar os valores, edite diretamente o arquivo `scripts/distribui-tokens.js` nas linhas:
-```javascript
-const amountEther = "0.01";  // Altere aqui
-const amountMPE1 = "5";      // Altere aqui
-const amountMPE2 = "5";      // Altere aqui
 ```
 
 ## 📊 Exemplo de Saída
@@ -132,6 +152,12 @@ const amountMPE2 = "5";      // Altere aqui
 ### Erro: "Arquivo recipient-addresses.txt não encontrado"
 **Solução:** Crie o arquivo na raiz do projeto com os endereços.
 
+### Erro: "Arquivo distribuicao-config.json não encontrado"
+**Solução:** Crie o arquivo na raiz do projeto definindo quais tokens enviar e as quantidades (veja a seção "Definir quais tokens enviar").
+
+### Erro: "Nenhum token habilitado para envio"
+**Solução:** No `distribuicao-config.json`, marque `"enviar": true` e uma `"quantidade"` maior que 0 para ao menos um token.
+
 ### Erro: "Nenhum endereço válido encontrado"
 **Solução:** Verifique se os endereços estão no formato correto (0x...) e são válidos.
 
@@ -150,4 +176,5 @@ npx hardhat run scripts/distribui-tokens.js --network localhost
 npx hardhat run scripts/distribui-tokens.js --network sepolia
 ```
 
-Distribui **0.01 ETH + 5 MPE1 + 5 MPE2** para cada endereço na lista.
+Distribui, para cada endereço da lista, a combinação de tokens definida no
+`distribuicao-config.json`.

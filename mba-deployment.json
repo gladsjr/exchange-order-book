@@ -1,0 +1,44 @@
+{
+  "network": "sepolia",
+  "chainId": 11155111,
+  "deployedAt": "2026-07-01T18:44:26.327Z",
+  "deployer": "0x9CdaE55751F0b4dbe9a09ecE1E4bDb2E64E957De",
+  "contracts": {
+    "mba1Token": {
+      "address": "0xde27C48EF877B5b1d43d20d6624BC1A3b1D756D3",
+      "name": "MBA1",
+      "symbol": "MBA1",
+      "decimals": 18,
+      "initialSupply": "1000000000"
+    },
+    "mba2Token": {
+      "address": "0x636Fe02aD6bD98F2507C7110A600c09C7E888176",
+      "name": "MBA2",
+      "symbol": "MBA2",
+      "decimals": 18,
+      "initialSupply": "1000000000"
+    }
+  },
+  "abi": [
+    "constructor(string,string,uint256)",
+    "event Approval(address indexed,address indexed,uint256)",
+    "event OwnershipTransferred(address indexed,address indexed)",
+    "event Transfer(address indexed,address indexed,uint256)",
+    "function allowance(address,address) view returns (uint256)",
+    "function approve(address,uint256) returns (bool)",
+    "function balanceOf(address) view returns (uint256)",
+    "function burn(address,uint256)",
+    "function decimals() view returns (uint8)",
+    "function decreaseAllowance(address,uint256) returns (bool)",
+    "function increaseAllowance(address,uint256) returns (bool)",
+    "function mint(address,uint256)",
+    "function name() view returns (string)",
+    "function owner() view returns (address)",
+    "function renounceOwnership()",
+    "function symbol() view returns (string)",
+    "function totalSupply() view returns (uint256)",
+    "function transfer(address,uint256) returns (bool)",
+    "function transferFrom(address,address,uint256) returns (bool)",
+    "function transferOwnership(address)"
+  ]
+}
