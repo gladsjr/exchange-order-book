@@ -1,0 +1,5 @@
+{
+  "eth":  { "enviar": true,  "quantidade": "0.01" },
+  "mpe1": { "enviar": true,  "quantidade": "5" },
+  "mpe2": { "enviar": true,  "quantidade": "5" }
+}
