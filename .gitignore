@@ -63,3 +63,6 @@ Thumbs.db
 # Deployment artifacts
 deployments/
 # frontend/deployment.json  <- Comentado para permitir commit (necessário para GitHub Pages)
+
+#endereços para transferência
+recipient-addresses.txt
