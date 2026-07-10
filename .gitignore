@@ -66,3 +66,5 @@ deployments/
 
 #endereços para transferência
 recipient-addresses.txt
+# Endereços de destinatários (dados locais)
+recipient-addresses.txt
